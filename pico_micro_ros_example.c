@@ -7,13 +7,14 @@
 #include <std_msgs/msg/int32.h>
 #include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/point32.h>
+#include <sensor_msgs/msg/imu.h>
 #include <rmw_microros/rmw_microros.h>
 #include "hardware/pwm.h"
 #include "pico/stdlib.h"
 #include "pico_uart_transports.h"
 #include "hardware/pio.h"
 #include "quadrature_encoder.pio.h"
-
+#include "haw/MPU6050.h"
 
 #define constrain(amt, low, high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 typedef struct MotorPins{
@@ -30,6 +31,9 @@ const motorPins motorA = {14,18,19};
 rcl_publisher_t publisher;
 std_msgs__msg__Int32 msg;
 
+rcl_publisher_t publisher_imu;
+sensor_msgs__msg__Imu imu_msg;
+
 rcl_publisher_t publisher_twist;
 geometry_msgs__msg__Twist geo_msg;
 
@@ -37,6 +41,9 @@ geometry_msgs__msg__Twist geo_msg;
 
 geometry_msgs__msg__Twist geo_msg;
 rcl_subscription_t pong_subscriber;
+
+mpu6050_t mpu6050;
+
 void controlMotors(float linear_velocity, float angular_velocity) ;
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
 void pong_subscription_callback(const void * msgin);
@@ -45,6 +52,9 @@ uint32_t pwm_set_freq_duty(uint slice_num,
 float fmap(float val, float in_min, float in_max, float out_min, float out_max) {
     return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
+int init_mpu6050_vals();
+int init_i2c();
+void timer2_callback(rcl_timer_t * timer, int64_t last_call_time);
 uint16_t pwmRight;
 uint16_t pwmLeft;
 int data = 0;
@@ -59,9 +69,7 @@ int PWM_MOTOR_MAX = 100;
 uint64_t last_trigger_time = 0;
 uint64_t last_trigger_time2 = 0;
 uint64_t timer_interval_us = 1000000;  // interval in microseconds (1 second)
-int main()
-{
-    
+int main(){
     rmw_uros_set_custom_transport(
 		true,
 		NULL,
@@ -70,11 +78,18 @@ int main()
 		pico_serial_transport_write,
 		pico_serial_transport_read
 	);
+
+    init_i2c();
+
+    mpu6050  = mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_GND);
+    int check = init_mpu6050_vals();
+    if(check){
+
+    }
     const uint PIN_AB = 20;
     int new_value, delta, old_value = 0;
     // should be in init function
-    for(int i = 16; i < 20; i++)
-    {
+    for(int i = 16; i < 20; i++){
         gpio_init(i);
         gpio_set_dir(i, GPIO_OUT);
     }
@@ -105,8 +120,7 @@ int main()
 
     rcl_ret_t ret = rmw_uros_ping_agent(timeout_ms, attempts);
 
-    if (ret != RCL_RET_OK)
-    {
+    if (ret != RCL_RET_OK){
         // Unreachable agent, exiting program.
         return ret;
     }
@@ -114,11 +128,38 @@ int main()
     rclc_support_init(&support, 0, NULL, &allocator);
     // std msg currently used for debugging : motor speeds
     rclc_node_init_default(&node, "pico_node", "", &support);
+
     rclc_publisher_init_default(
         &publisher,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
         "pico_publisher");
+
+
+    rclc_publisher_init_default(
+        &publisher_imu,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+
+        "pico_imu");
+
+    rclc_publisher_init_default(
+        &publisher_twist,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
+        "pico_twist");
+    
+
+    // subscriber for cmdvel
+	rclc_subscription_init_best_effort(&pong_subscriber,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
+        "/cmd_vel");
+
+
+	rclc_executor_init(&executor, &support.context,
+        3,
+        &allocator);
 
     // timer for mtoor controll
     rclc_timer_init_default(
@@ -127,26 +168,23 @@ int main()
         RCL_MS_TO_NS(1),
         timer_callback);
 
-    // subscriber for cmdvel
-	rclc_subscription_init_best_effort(&pong_subscriber,
-     &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
-       "/cmd_vel");
+    rcl_ret_t rc = rclc_timer_init_default(
+        &timer2,
+        &support,
+        RCL_MS_TO_NS(1000),
+        timer2_callback);
 
-    rclc_publisher_init_default(
-    &publisher_twist,
-    &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
-    "pico_twist");
-	rclc_executor_init(&executor, &support.context,
-     2,
-      &allocator);
 	rclc_executor_add_timer(&executor, &timer);
-        rclc_executor_add_subscription(&executor,
-     &pong_subscriber,
-      &geo_msg,
-       &pong_subscription_callback,
-       ON_NEW_DATA);
+    rc = rclc_executor_add_timer(&executor, &timer2);
+    if (rc != RCL_RET_OK) {
+
+    
+    }
+    rclc_executor_add_subscription(&executor,
+        &pong_subscriber,
+        &geo_msg,
+        &pong_subscription_callback,
+        ON_NEW_DATA);
 
     gpio_put(LED_PIN, 1);
     gpio_put(motorB.IN1_PIN, 0);
@@ -159,6 +197,8 @@ int main()
     uint offset = pio_add_program(pio, &quadrature_encoder_program);
     quadrature_encoder_program_init(pio, sm, offset, PIN_AB, 0);
     
+    mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_GND);
+
     while (true)
     {
 
@@ -179,8 +219,18 @@ int main()
     return 0;
 }
 
-void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
-{	
+int init_i2c(){
+    gpio_init(PICO_DEFAULT_I2C_SDA_PIN);
+    gpio_init(PICO_DEFAULT_I2C_SCL_PIN);
+    gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+    // Don't forget the pull ups! | Or use external ones
+    gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
+    gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
+    return 0;
+}
+
+void timer_callback(rcl_timer_t * timer, int64_t last_call_time){	
 
     if (timer == NULL) {
         return;
@@ -242,6 +292,18 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 
 }
 
+void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){	
+
+    if (timer == NULL) {
+        return;
+    }
+    mpu6050_event(&mpu6050);
+
+    // Pointers to float vectors with all the results
+    // mpu6050_vectorf_t *accel = mpu6050_get_accelerometer(&mpu6050);
+    // mpu6050_vectorf_t *gyro = mpu6050_get_gyroscope(&mpu6050);
+    publish_imu_raw();
+}
 
 void controlMotors(float linear_velocity, float angular_velocity) {
     // Calculate motor speeds based on linear and angular velocities\
@@ -322,8 +384,7 @@ void controlMotors(float linear_velocity, float angular_velocity) {
     // pwm_set_gpio_level(RIGHT_MOTOR_PWM_PIN, (uint16_t)(fabs(right_speed) * PWM_RANGE));
 }
 
-void pong_subscription_callback(const void * msgin)
-{
+void pong_subscription_callback(const void * msgin){
    
     rcl_publish(&publisher_twist, &geo_msg, NULL);
     printf("turtle %f\n", geo_msg.linear.x);
@@ -343,4 +404,55 @@ uint32_t pwm_set_freq_duty(uint slice_num,
  pwm_set_wrap(slice_num, wrap);
  pwm_set_chan_level(slice_num, chan, wrap * d / 100);
  return wrap;
+}
+
+int init_mpu6050_vals(){
+    if(mpu6050_begin(&mpu6050)){
+        // Set scale of gyroscope
+        mpu6050_set_scale(&mpu6050, MPU6050_SCALE_2000DPS);
+        // Set range of accelerometer
+        mpu6050_set_range(&mpu6050, MPU6050_RANGE_16G);
+
+        // Enable temperature, gyroscope and accelerometer readings
+        mpu6050_set_temperature_measuring(&mpu6050, true);
+        mpu6050_set_gyroscope_measuring(&mpu6050, true);
+        mpu6050_set_accelerometer_measuring(&mpu6050, true);
+
+        // Enable free fall, motion and zero motion interrupt flags
+        mpu6050_set_int_free_fall(&mpu6050, false);
+        mpu6050_set_int_motion(&mpu6050, false);
+        mpu6050_set_int_zero_motion(&mpu6050, false);
+
+        // Set motion detection threshold and duration
+        mpu6050_set_motion_detection_threshold(&mpu6050, 2);
+        mpu6050_set_motion_detection_duration(&mpu6050, 5);
+
+        // Set zero motion detection threshold and duration
+        mpu6050_set_zero_motion_detection_threshold(&mpu6050, 4);
+        mpu6050_set_zero_motion_detection_duration(&mpu6050, 2);
+        return 0;
+    }
+    else{
+        return 1;
+    }
+    
+        
+}
+
+void publish_imu_raw() {
+    uint64_t current_time = time_us_64();
+    mpu6050_vectorf_t *accel = mpu6050_get_accelerometer(&mpu6050);
+    mpu6050_vectorf_t *gyro = mpu6050_get_gyroscope(&mpu6050);
+    imu_msg.header.frame_id.data = ("imu_link");
+    imu_msg.header.stamp.sec = current_time  / 1000000;
+
+    imu_msg.angular_velocity.x =  gyro->x;
+    imu_msg.angular_velocity.y = gyro->y;
+    imu_msg.angular_velocity.z = gyro->z;
+    imu_msg.linear_acceleration.x = accel->x;
+    imu_msg.linear_acceleration.y = accel->y;
+    imu_msg.linear_acceleration.z = accel->z;
+    // publish imu data
+    rcl_publish(&publisher_imu, &imu_msg, NULL);
+
 }

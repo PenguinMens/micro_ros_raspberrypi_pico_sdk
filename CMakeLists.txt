@@ -7,7 +7,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
-
+add_subdirectory(mpu6050)
 link_directories(libmicroros)
 add_executable(pico_micro_ros_example
     pico_micro_ros_example.c
@@ -20,6 +20,8 @@ target_link_libraries(pico_micro_ros_example
     microros
     hardware_gpio hardware_pwm
     hardware_pio
+    hardware_i2c
+    haw_mpu6050
 )
 
 target_include_directories(pico_micro_ros_example PUBLIC
