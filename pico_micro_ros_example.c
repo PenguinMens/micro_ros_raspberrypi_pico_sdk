@@ -42,6 +42,13 @@ geometry_msgs__msg__Twist geo_msg;
 geometry_msgs__msg__Twist geo_msg;
 rcl_subscription_t pong_subscriber;
 
+rcl_timer_t timer; // general timer current used for motor
+rcl_timer_t timer2; // general timer used to measure encoder
+rcl_node_t node;
+rcl_allocator_t allocator;
+rclc_support_t support;
+rclc_executor_t executor;
+
 mpu6050_t mpu6050;
 
 void controlMotors(float linear_velocity, float angular_velocity) ;
@@ -105,12 +112,6 @@ int main(){
     pwm_set_enabled(slice_num_A, true);
 
 
-    rcl_timer_t timer; // general timer current used for motor
-    rcl_timer_t timer2; // general timer used to measure encoder
-    rcl_node_t node;
-    rcl_allocator_t allocator;
-    rclc_support_t support;
-    rclc_executor_t executor;
 
     allocator = rcl_get_default_allocator();
 
