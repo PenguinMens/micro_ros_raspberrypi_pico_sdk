@@ -12,6 +12,10 @@ link_directories(libmicroros)
 add_executable(pico_micro_ros_example
     pico_micro_ros_example.c
     pico_uart_transport.c
+    custom_pwm.c
+    motor_control.c
+    utils.c
+    encoder.c
 )
 
 pico_generate_pio_header(pico_micro_ros_example ${CMAKE_CURRENT_LIST_DIR}/quadrature_encoder.pio)
