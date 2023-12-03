@@ -4,6 +4,8 @@
 
 MotorPins motorB;
 MotorPins motorA;
+MotorStats motorStatsA;
+MotorStats motorStatsB;
 int PWM_MOTOR_MIN = 0;
 int PWM_MOTOR_MAX = 100;
 
@@ -36,6 +38,7 @@ void init_motors(uint PWMB, uint BIN1,uint BIN2,uint PWMA, uint AIN1,uint AIN2){
 
     motorA.motor_pwm_val = 0;
     motorB.motor_pwm_val = 0;
+
 }
 int controlMotors(float linear_velocity,  float angular_velocity) {
     // Calculate motor speeds based on linear and angular velocities\
@@ -119,7 +122,12 @@ int controlMotors(float linear_velocity,  float angular_velocity) {
     
     return 0;
 }
+void doPID(float &sp, float &pv, float &err,
+		float &p, float &i, float &d)
+{
 
+}
+void setMotorSpeedRPS(float RPS, int dir)
 int controlMotorsPID(float linear_velocity, float angular_velocity, float linear_velocity_target) {
     // Calculate motor speeds based on linear and angular velocities
     float left_speed = (linear_velocity - angular_velocity) / 2.0f;

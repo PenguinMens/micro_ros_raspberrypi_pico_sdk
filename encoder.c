@@ -44,7 +44,21 @@ int32_t get_encoder_count(uint encoder){
     return quadrature_encoder_get_count(pio,encoder);
 
 }
+float get_RPS(int ind)
+{
+    switch (ind)
+    {
+    case 1 /* constant-expression */:
+        /* code */
+        
+        break;
+    case 2:
+        break;
+    default:
+        break;
+    }
 
+}
 float calc_stats(float time, Odemtry_values *vals){
     int32_t pulse_count_1 = get_encoder_count(ENCODER1);
     int32_t pulse_count_2 = get_encoder_count(ENCODER2);

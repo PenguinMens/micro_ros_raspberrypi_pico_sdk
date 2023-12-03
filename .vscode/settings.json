@@ -1,0 +1,15 @@
+{
+    "cmake.buildEnvironment": {
+        "PICO_SDK_PATH": "/home/gabriel/pico-sdk"
+    },
+    "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "imu.h": "c",
+        "rmw_microros.h": "c",
+        "cmath": "c"
+    },
+    "cmake.configureEnvironment": {
+        "PICO_SDK_PATH": "/home/gabriel/pico-sdk"
+    }
+}

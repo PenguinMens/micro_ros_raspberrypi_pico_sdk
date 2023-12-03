@@ -14,7 +14,10 @@ typedef struct MotorPins{
     float motor_pwm_val;
 } MotorPins;
 
-
+typedef struct MotorStats{
+    float velocity;
+    float rps;
+} MotorStats;
 int controlMotors(float linear_velocity, float angular_velocity);
 void init_motors();
 int controlMotorsPID(float linear_velocity, float angular_velocity, float linear_velocity_target);

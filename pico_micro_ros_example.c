@@ -13,7 +13,6 @@
 
 #include "custom_pwm.h"
 #include "motor_control.h"
-#include "haw/MPU6050.h"
 #include "quadrature_encoder.pio.h"
 #include "encoder.h"
 
@@ -84,7 +83,7 @@ int main(){
 	);
 
     init_i2c();
-    init_motors(15,17,16,14,18,19);
+        
     const uint PIN_AB = 20;
     const uint PIN_CD = 12;
 
