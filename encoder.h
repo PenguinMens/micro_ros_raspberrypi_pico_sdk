@@ -9,24 +9,10 @@
 // Function declaration
 
 
-// TODO NEED TO GIVE COPYRIGHT
-typedef struct {
-  int RESOLUTION;
-  int PULSES_PER_REV;
-  int PULSES_PER_REV_GEAR;
-  int FRAME_TIME_MS;
-  float WHEEL_DIAMETER;
-  float WHEEL_BASE;
-} encoder_setup_t;
-
-typedef struct {
-    double x;     // X-coordinate of the car's position (in meters)
-    double y;     // Y-coordinate of the car's position (in meters)
-    double theta;
-    double linear_velocity;  // Linear velocity of the car (in m/s)
-    double angular_velocity; // Angular velocity of the car (in rad/s)
-} Odemtry_values;
-float calc_stats(float time, Odemtry_values *vals);
 int init_PIO_encoder(uint PIN_AB, uint PIN_CD, uint encode1, uint encode2);
-int32_t get_encoder_count(uint encoder);
+int32_t get_encoder_count_A();
+int32_t get_encoder_count_B();
+int32_t encoder_read_and_reset(uint encoder); // not working
+int32_t encoder_read_and_reset_A();
+int32_t encoder_read_and_reset_B();
 #endif // ENCODER_INIT_H

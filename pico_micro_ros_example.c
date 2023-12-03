@@ -13,16 +13,20 @@
 
 #include "custom_pwm.h"
 #include "motor_control.h"
+#include "motor_calcs.h"
+#include "motor_pid.h"
 #include "quadrature_encoder.pio.h"
 #include "encoder.h"
-
+#include "haw/MPU6050.h"
 #include "pico/stdlib.h"
 #include "pico_uart_transports.h"
 #include "hardware/pio.h"
 
-
-
-
+float time_test = 0.0f;
+float left_speed_target = 0;
+float right_speed_target =0;
+MotorStats motorStatsA;
+MotorStats motorStatsB;
 
 const uint LED_PIN = 25;
 Odemtry_values odo_vals;
@@ -56,9 +60,10 @@ mpu6050_t mpu6050;
 
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
 void pong_subscription_callback(const void * msgin);
-
+int controlMotorsPID(float dt);
 int init_mpu6050_vals();
 int init_i2c();
+void publish_imu_raw();
 void timer2_callback(rcl_timer_t * timer, int64_t last_call_time);
 void timer3_callback(rcl_timer_t * timer, int64_t last_call_time);
 void publish_odo();
@@ -83,7 +88,12 @@ int main(){
 	);
 
     init_i2c();
-        
+    float kp =  50;
+    float ki =0;  
+    float kd = 0;
+    init_motors(15,17,16,14,18,19);
+    pid_init(&motorStatsA.pid, kp, ki, kd, 0);
+    pid_init(&motorStatsB.pid, kp, ki, kd, 0);
     const uint PIN_AB = 20;
     const uint PIN_CD = 12;
 
@@ -162,7 +172,7 @@ int main(){
     rclc_timer_init_default(
         &timer3,
         &support,
-        RCL_MS_TO_NS(1),
+        RCL_MS_TO_NS(10),
         timer3_callback);
 	rclc_executor_add_timer(&executor, &timer);
     rclc_executor_add_timer(&executor, &timer2);
@@ -221,16 +231,29 @@ void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){
 }
 
 void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
-    msg.data = get_encoder_count(ENCODERB);
+    int32_t test = get_encoder_count_B(); 
+
+    msg.data = test;
     rcl_publish(&publisher,&msg,NULL);
-    publish_odo();
-    controlMotorsPID(odo_vals.linear_velocity, geo_msg.angular.z,geo_msg.linear.x);
+    time_test =  last_call_time/1000000.0f;
+    odo_msg.pose.pose.orientation.w = time_test;
+    calc_stats(time_test, &odo_vals,encoder_read_and_reset_A(),encoder_read_and_reset_B(), &motorStatsA, &motorStatsB );
+
+    publish_odo(last_call_time);
+    controlMotorsPID(RCL_NS_TO_S(last_call_time));
     
 }
 
 void pong_subscription_callback(const void * msgin){
     
     rcl_publish(&publisher_twist, &geo_msg, NULL);
+    left_speed_target =  geo_msg.linear.x - 0.5f*geo_msg.angular.z*0.2;
+    right_speed_target = geo_msg.linear.x + 0.5f*geo_msg.angular.z*0.2;
+    pid_set_setpoint(&motorStatsB.pid, right_speed_target);
+    pid_set_setpoint(&motorStatsA.pid, left_speed_target);
+
+    
+
     printf("turtle %f\n", geo_msg.linear.x);
 }
 
@@ -267,16 +290,12 @@ int init_mpu6050_vals(){
     
         
 }
-void publish_odo()
+void publish_odo(uint64_t current_time)
 {
-     uint64_t current_time = time_us_64();
-    uint64_t dt = (current_time- last_trigger_time3)/1000;
-    last_trigger_time3 = current_time;
-    float rpm = calc_stats(dt, &odo_vals);
     odo_msg.header.frame_id.data = "odom";
     odo_msg.child_frame_id.data = "base_link";
-    odo_msg.header.stamp.sec = (uint32_t) (current_time / 1000000);
-
+    odo_msg.header.stamp.sec = (int32_t) current_time/1000000 ;
+    odo_msg.header.stamp.nanosec = (int32_t) (current_time%1000000)*1000;
 
     odo_msg.pose.pose.position.x = odo_vals.x; // x position
     odo_msg.pose.pose.position.y = odo_vals.y; // y position
@@ -285,14 +304,14 @@ void publish_odo()
     odo_msg.pose.pose.orientation.x = 0.0; // x orientation 
     odo_msg.pose.pose.orientation.y = 0.0; // y orientation
     odo_msg.pose.pose.orientation.z = odo_vals.theta;
-    odo_msg.pose.pose.orientation.w = 0.0; // w orientation
+    // odo_msg.pose.pose.orientation.w = 0.0; // w orientation
     // set the linear velocity 
     odo_msg.twist.twist.linear.x = odo_vals.linear_velocity;
-    odo_msg.twist.twist.linear.y = rpm;
-    odo_msg.twist.twist.linear.z = 0.0;
+    odo_msg.twist.twist.linear.y = left_speed_target;
+    odo_msg.twist.twist.linear.z = right_speed_target;
     // set the angular velocity 
-    odo_msg.twist.twist.angular.x = 0.0;
-    odo_msg.twist.twist.angular.y = 0.0;
+    odo_msg.twist.twist.angular.x = motorStatsA.rps;
+    odo_msg.twist.twist.angular.y = motorStatsB.rps;
     odo_msg.twist.twist.angular.z = odo_vals.angular_velocity;
     rcl_publish(&publisher_odomoter, &odo_msg, NULL);
 }
@@ -301,7 +320,7 @@ void publish_imu_raw() {
     mpu6050_vectorf_t *accel = mpu6050_get_accelerometer(&mpu6050);
     mpu6050_vectorf_t *gyro = mpu6050_get_gyroscope(&mpu6050);
     imu_msg.header.frame_id.data = ("imu_link");
-    imu_msg.header.stamp.sec = current_time  / 1000000;
+    imu_msg.header.stamp.sec = RCL_NS_TO_S(current_time);
 
     imu_msg.angular_velocity.x =  gyro->x;
     imu_msg.angular_velocity.y = gyro->y;
@@ -312,4 +331,24 @@ void publish_imu_raw() {
     // publish imu data
     rcl_publish(&publisher_imu, &imu_msg, NULL);
 
+}
+
+int controlMotorsPID(float dt)
+{
+    float outputA = pid_update(&motorStatsA.pid, motorStatsA.velocity, dt);
+    float pwmA =  fabs(outputA);
+    if (pwmA > 100.0f)
+        pwmA = 100.0f;
+    
+    float outputB = pid_update(&motorStatsB.pid, motorStatsB.velocity, dt);
+    float pwmB = fabs(outputB);
+    if (pwmB > 100.0f)
+        pwmB = 100.0f;
+
+    //printMotorStats(motorStatsA);
+    //printMotorStats(motorStatsB);
+    controlLeftMotor(left_speed_target, pwmA);
+    controlRightMotor(right_speed_target, pwmB);
+
+    return 0;
 }

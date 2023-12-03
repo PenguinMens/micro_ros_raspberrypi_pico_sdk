@@ -14,11 +14,7 @@ typedef struct MotorPins{
     float motor_pwm_val;
 } MotorPins;
 
-typedef struct MotorStats{
-    float velocity;
-    float rps;
-} MotorStats;
-int controlMotors(float linear_velocity, float angular_velocity);
-void init_motors();
-int controlMotorsPID(float linear_velocity, float angular_velocity, float linear_velocity_target);
+void init_motors(uint PWMB, uint BIN1, uint BIN2, uint PWMA, uint AIN1, uint AIN2);
+int controlLeftMotor(float dir, int pwm);
+int controlRightMotor(float dir, int pwm);
 #endif // MOTOR_CONTROL_H
