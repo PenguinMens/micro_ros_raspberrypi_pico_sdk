@@ -47,8 +47,8 @@ void calc_stats(float time, Odemtry_values *vals, int32_t ENCODER1_TICKS,int32_t
     SUM2 = SUM2 + VALUE2;                 // Add the newest reading to the sum
     INDEX2 = (INDEX2+1) % WINDOW_SIZE;   // Increment the index, and wrap to 0 if it exceeds the window size
     AVERAGED2 = SUM2 / WINDOW_SIZE;      // Divide the sum of the window by the window size for the result
-    motorStatsA->velocity = rmp_1;
-    motorStatsB->velocity = rmp_2;
+    motorStatsA->velocity = AVERAGED;
+    motorStatsB->velocity = AVERAGED2;
     vals->linear_velocity = (AVERAGED + AVERAGED2)/ 2;
     vals->angular_velocity = ((AVERAGED- AVERAGED2) * encoder_setup.WHEEL_DIAMETER)/(2* encoder_setup.WHEEL_BASE);
 

@@ -27,7 +27,8 @@ float left_speed_target = 0;
 float right_speed_target =0;
 MotorStats motorStatsA;
 MotorStats motorStatsB;
-
+int32_t test_A = 0;
+int32_t test_B = 0;
 const uint LED_PIN = 25;
 Odemtry_values odo_vals;
 // incrimenting puiblisher
@@ -75,8 +76,8 @@ uint64_t last_trigger_time = 0;
 uint64_t last_trigger_time2 = 0;
 uint64_t last_trigger_time3 = 0;
 uint64_t timer_interval_us = 1000000;  // interval in microseconds (1 second)
-const uint ENCODERA;
-const uint ENCODERB;
+const uint ENCODERA =0;
+const uint ENCODERB = 1;
 int main(){
     rmw_uros_set_custom_transport(
 		true,
@@ -88,9 +89,9 @@ int main(){
 	);
 
     init_i2c();
-    float kp =  50;
-    float ki =0;  
-    float kd = 0;
+    float kp =  20;
+    float ki =1;  
+    float kd = 0.1;
     init_motors(15,17,16,14,18,19);
     pid_init(&motorStatsA.pid, kp, ki, kd, 0);
     pid_init(&motorStatsB.pid, kp, ki, kd, 0);
@@ -231,16 +232,19 @@ void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){
 }
 
 void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
-    int32_t test = get_encoder_count_B(); 
 
-    msg.data = test;
+
+    
+    test_A = encoder_read_and_reset_A();
+    test_B = encoder_read_and_reset_B();
+    msg.data = test_A;
     rcl_publish(&publisher,&msg,NULL);
     time_test =  last_call_time/1000000.0f;
     odo_msg.pose.pose.orientation.w = time_test;
-    calc_stats(time_test, &odo_vals,encoder_read_and_reset_A(),encoder_read_and_reset_B(), &motorStatsA, &motorStatsB );
+    calc_stats(time_test, &odo_vals,test_A,test_B, &motorStatsA, &motorStatsB );
 
     publish_odo(last_call_time);
-    controlMotorsPID(RCL_NS_TO_S(last_call_time));
+    controlMotorsPID(time_test);
     
 }
 
@@ -294,7 +298,7 @@ void publish_odo(uint64_t current_time)
 {
     odo_msg.header.frame_id.data = "odom";
     odo_msg.child_frame_id.data = "base_link";
-    odo_msg.header.stamp.sec = (int32_t) current_time/1000000 ;
+    odo_msg.header.stamp.sec = test_B;
     odo_msg.header.stamp.nanosec = (int32_t) (current_time%1000000)*1000;
 
     odo_msg.pose.pose.position.x = odo_vals.x; // x position
