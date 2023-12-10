@@ -87,7 +87,9 @@ int main(){
 		pico_serial_transport_write,
 		pico_serial_transport_read
 	);
-
+    gpio_init(6);
+    gpio_set_dir(6, GPIO_OUT);
+    gpio_put(6, 1);
     init_i2c();
     float kp =  20;
     float ki =1;  
@@ -99,9 +101,9 @@ int main(){
     const uint PIN_CD = 12;
 
     init_PIO_encoder(PIN_AB, PIN_CD, ENCODERA,ENCODERB);
-    mpu6050  = mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_GND);
+    mpu6050  = mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_VCC);
     int check = init_mpu6050_vals();
-
+    msg.data = check;
     int new_value, delta, old_value = 0;
 
     allocator = rcl_get_default_allocator();
@@ -237,7 +239,7 @@ void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
     
     test_A = encoder_read_and_reset_A();
     test_B = encoder_read_and_reset_B();
-    msg.data = test_A;
+    //msg.data = test_A;
     rcl_publish(&publisher,&msg,NULL);
     time_test =  last_call_time/1000000.0f;
     odo_msg.pose.pose.orientation.w = time_test;
@@ -324,14 +326,14 @@ void publish_imu_raw() {
     mpu6050_vectorf_t *accel = mpu6050_get_accelerometer(&mpu6050);
     mpu6050_vectorf_t *gyro = mpu6050_get_gyroscope(&mpu6050);
     imu_msg.header.frame_id.data = ("imu_link");
-    imu_msg.header.stamp.sec = RCL_NS_TO_S(current_time);
+    imu_msg.header.stamp.sec = (int32_t) (current_time/1000000);
 
     imu_msg.angular_velocity.x =  gyro->x;
-    imu_msg.angular_velocity.y = gyro->y;
-    imu_msg.angular_velocity.z = gyro->z;
-    imu_msg.linear_acceleration.x = accel->x;
-    imu_msg.linear_acceleration.y = accel->y;
-    imu_msg.linear_acceleration.z = accel->z;
+     imu_msg.angular_velocity.y = gyro->y;
+     imu_msg.angular_velocity.z = gyro->z;
+     imu_msg.linear_acceleration.x = accel->x;
+     imu_msg.linear_acceleration.y = accel->y;
+     imu_msg.linear_acceleration.z = accel->z;
     // publish imu data
     rcl_publish(&publisher_imu, &imu_msg, NULL);
 
