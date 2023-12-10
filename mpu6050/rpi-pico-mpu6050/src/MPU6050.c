@@ -128,9 +128,10 @@ struct mpu6050 mpu6050_init(i2c_inst_t *i2c_instance, const uint8_t address)
 
 uint8_t mpu6050_begin(struct mpu6050 *self)
 {
-    if (mpu6050_who_am_i(self) != 0x68) // 0x68 default WHO_AM_I value
+    uint8_t temp  = mpu6050_who_am_i(self);
+    if (temp != 0x68) // 0x68 default WHO_AM_I value
     {
-        return 0;
+        return temp;
     }
 
     mpu6050_set_clock_source(self, MPU6050_CLOCK_INTERNAL); // Default Clock
