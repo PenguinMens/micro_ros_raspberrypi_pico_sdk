@@ -30,7 +30,7 @@ MotorStats motorStatsB;
 int32_t test_A = 0;
 int32_t test_B = 0;
 const uint LED_PIN = 25;
-Odemtry_values odo_vals;
+Odometry_values odo_vals;
 // incrimenting puiblisher
 rcl_publisher_t publisher;
 std_msgs__msg__Int32 msg;
@@ -238,6 +238,7 @@ void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
     
     test_A = get_encoder_count_A();
     test_B = get_encoder_count_B();
+    reset_encoders();
     msg.data = test_A;
     rcl_publish(&publisher,&msg,NULL);
     time_test =  last_call_time/1000000.0f;
@@ -300,7 +301,7 @@ void publish_odo(uint64_t current_time)
 {
     odo_msg.header.frame_id.data = "odom";
     odo_msg.child_frame_id.data = "base_link";
-    odo_msg.header.stamp.sec = test_B;
+    odo_msg.header.stamp.sec = (int32_t) (current_time/1000000);
     odo_msg.header.stamp.nanosec = (int32_t) (current_time%1000000)*1000;
 
     odo_msg.pose.pose.position.x = odo_vals.x; // x position
