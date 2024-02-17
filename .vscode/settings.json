@@ -9,7 +9,8 @@
         "rmw_microros.h": "c",
         "cmath": "c",
         "pico_uart_transports.h": "c",
-        "motor_control.h": "c"
+        "motor_control.h": "c",
+        "custom_pwm.h": "c"
     },
     "cmake.configureEnvironment": {
         "PICO_SDK_PATH": "/home/gabriel/pico-sdk"
