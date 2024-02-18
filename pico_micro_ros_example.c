@@ -342,20 +342,20 @@ void publish_imu_raw() {
 
 int controlMotorsPID(float dt)
 {
-    float outputA = pid_update(&motorStatsA.pid, motorStatsA.velocity, dt);
-    float pwmA =  fabs(outputA);
-    if (pwmA > 100.0f)
-        pwmA = 100.0f;
+    // float outputA = pid_update(&motorStatsA.pid, motorStatsA.velocity, dt);
+    // float pwmA =  fabs(outputA);
+    // if (pwmA > 100.0f)
+    //     pwmA = 100.0f;
     
-    float outputB = pid_update(&motorStatsB.pid, motorStatsB.velocity, dt);
-    float pwmB = fabs(outputB);
-    if (pwmB > 100.0f)
-        pwmB = 100.0f;
+    // float outputB = pid_update(&motorStatsB.pid, motorStatsB.velocity, dt);
+    // float pwmB = fabs(outputB);
+    // if (pwmB > 100.0f)
+    //     pwmB = 100.0f;
 
     //printMotorStats(motorStatsA);
     //printMotorStats(motorStatsB);
-    controlLeftMotor(left_speed_target, pwmA);
-    controlRightMotor(right_speed_target, pwmB);
+    controlLeftMotor(left_speed_target, 50);
+    controlRightMotor(right_speed_target, 50);
 
     return 0;
 }
