@@ -8,7 +8,7 @@
 //   - d: Desired duty cycle percentage (0-100)
 // Returns:
 //   - The calculated wrap value
-uint32_t pwm_set_freq_duty(uint slice_num, uint chan, uint32_t f, int d) {
+uint32_t pwm_set_freq_duty(uint slice_num, uint chan, uint32_t f, float d) {
     // Clock frequency (assuming 125 MHz)
     uint32_t clock = 125000000;
     // Calculate divider to achieve desired frequency
@@ -22,8 +22,9 @@ uint32_t pwm_set_freq_duty(uint slice_num, uint chan, uint32_t f, int d) {
     pwm_set_clkdiv_int_frac(slice_num, divider16 / 16, divider16 & 0xF);
     // Set wrap value for PWM slice
     pwm_set_wrap(slice_num, wrap);
-    // Set channel level based on duty cycle
-    pwm_set_chan_level(slice_num, chan, wrap * d / 100);
+    // Set channel level based on duty cycle    
+    int duty =(int)((wrap * d )/100);
+    pwm_set_chan_level(slice_num, chan,duty);
     // Return the calculated wrap value
     return wrap;
 }

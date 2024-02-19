@@ -38,7 +38,7 @@ void init_motors(uint PWMB, uint BIN1, uint BIN2, uint PWMA, uint AIN1, uint AIN
  * Returns:
  *   Returns the status of the motor control operation.
  */
-int controlLeftMotor(float dir, int pwm);
+int controlLeftMotor(float dir, float pwm);
 
 /**
  * Controls the right motor direction and PWM value.
@@ -48,6 +48,6 @@ int controlLeftMotor(float dir, int pwm);
  * Returns:
  *   Returns the status of the motor control operation.
  */
-int controlRightMotor(float dir, int pwm);
+int controlRightMotor(float dir, float pwm);
 
 #endif // MOTOR_CONTROL_H

@@ -21,8 +21,8 @@
 #include "pico/stdlib.h"
 #include "pico_uart_transports.h"
 #include "hardware/pio.h"
-
-#define ROS_MODE 0
+#include <inttypes.h>
+#define ROS_MODE 1
 
 float time_test = 0.0f;
 float left_speed_target = 0;
@@ -65,7 +65,7 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
 void pong_subscription_callback(const void * msgin);
 int controlMotorsPID(float dt);
 void update_setpoint(double x, double z);
-void cacluate_motor_stats(int64_t last_call_time);
+void cacluate_motor_stats(uint64_t last_call_time);
 int init_mpu6050_vals();
 int init_i2c();
 void publish_imu_raw();
@@ -88,14 +88,14 @@ int main(){
     gpio_set_dir(6, GPIO_OUT);
     gpio_put(6, 1);
     init_i2c();
-    float kp =  20;
-    float ki =1;  
-    float kd = 0.1;
-    init_motors(15,17,16,14,18,19);
+    float kp =  250;
+    float ki =50;  
+    float kd = 1;
+    init_motors(15,17,16,14,19,18);
     pid_init(&motorStatsA.pid, kp, ki, kd, 0);
     pid_init(&motorStatsB.pid, kp, ki, kd, 0);
-    const uint PIN_AB = 20;
-    const uint PIN_CD = 12;
+    const uint PIN_AB = 12;
+    const uint PIN_CD = 20;
 
     init_PIO_encoder(PIN_AB, PIN_CD, ENCODERA,ENCODERB);
     mpu6050  = mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_GND);
@@ -194,7 +194,7 @@ int main(){
 
     #else    
     stdio_init_all();
-    update_setpoint(0.00,0);
+    update_setpoint(0.1,0);
 
     #endif
 
@@ -254,13 +254,15 @@ void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){
     publish_imu_raw(); 
 }
 
-void cacluate_motor_stats( int64_t last_call_time)
+void cacluate_motor_stats( uint64_t last_call_time)
 {
     
     test_A = get_encoder_count_A();
     test_B = get_encoder_count_B();
     reset_encoders();
-    time_test =  last_call_time/1000000.0f;
+    time_test =  last_call_time/1000.0f;
+
+    //printf("%" PRIu64 "\n", last_call_time);
     calc_stats(time_test, &odo_vals,test_A,test_B, &motorStatsA, &motorStatsB );
     controlMotorsPID(time_test);
 }
@@ -385,15 +387,16 @@ int controlMotorsPID(float dt)
     float outputB = pid_update(&motorStatsB.pid, motorStatsB.velocity, dt);
     float pwmB = fabs(outputB);
     if (pwmB > 100.0f) pwmB = 100.0f;
+    
 
     // Assuming `getCurrentTime()` is a function that returns the current time in milliseconds or another unit
     
 
-    printf("%f, A, %f, %f, %f, %f\n", dt, outputA, pwmA, motorStatsA.velocity,left_speed_target);
-    printf("%f, B, %f, %f, %f, %f\n", dt, outputB, pwmB, motorStatsB.velocity, right_speed_target);
-
-    controlLeftMotor(left_speed_target, pwmA);
-    controlRightMotor(right_speed_target, pwmB);
+    printf("%f, A, %f, %f, %f, %f, %f ,%d\n", dt, outputA, pwmA, motorStatsA.velocity,left_speed_target,  odo_vals.linear_velocity, test_A);
+    // printf("%f, B, %f, %f, %f, %f, %f\n", dt, outputB, pwmB, motorStatsB.velocity, right_speed_target,  odo_vals.linear_velocity);
+    printf("%f, B, %f, %f, %f, %f, %f, %d\n", dt, outputB, pwmB, motorStatsB.velocity,  right_speed_target,  odo_vals.linear_velocity, test_B);
+    controlLeftMotor(outputA, pwmA);
+    controlRightMotor(outputB, pwmB);
 
     return 0;
 }

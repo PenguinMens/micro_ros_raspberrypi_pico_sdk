@@ -13,12 +13,13 @@ void pid_init(PIDController* pid, float Kp, float Ki, float Kd, float setpoint) 
 }
 
 // Update PID controller and compute control output
-float pid_update(PIDController* pid, float input, float dt) {
+float pid_update(PIDController* pid, float input, float dt_ms) {
+    float dt = dt_ms/1000.0f;
     float error = pid->setpoint - input;
-    pid->integral += error * dt;
+    pid->integral = pid->integral + error * dt;
     float derivative = (error - pid->previous_error) / dt;
     float output = pid->Kp * error + pid->Ki * pid->integral + pid->Kd * derivative;
-    
+   // printf("%f,%f,%f\n", error,pid->integral, derivative);
     // Update previous_error for next iteration
     pid->previous_error = error;
 
