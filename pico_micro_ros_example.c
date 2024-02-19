@@ -22,6 +22,8 @@
 #include "pico_uart_transports.h"
 #include "hardware/pio.h"
 
+#define ROS_MODE 0
+
 float time_test = 0.0f;
 float left_speed_target = 0;
 float right_speed_target =0;
@@ -62,6 +64,8 @@ mpu6050_t mpu6050;
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
 void pong_subscription_callback(const void * msgin);
 int controlMotorsPID(float dt);
+void update_setpoint(double x, double z);
+void cacluate_motor_stats(int64_t last_call_time);
 int init_mpu6050_vals();
 int init_i2c();
 void publish_imu_raw();
@@ -75,18 +79,11 @@ int flag = 1;
 uint64_t last_trigger_time = 0;
 uint64_t last_trigger_time2 = 0;
 uint64_t last_trigger_time3 = 0;
-uint64_t timer_interval_us = 1000000;  // interval in microseconds (1 second)
+uint64_t timer_interval_us = 20000;  // interval in microseconds (1 second)
 const uint ENCODERA =0;
 const uint ENCODERB = 1;
 int main(){
-    rmw_uros_set_custom_transport(
-		true,
-		NULL,
-		pico_serial_transport_open,
-		pico_serial_transport_close,
-		pico_serial_transport_write,
-		pico_serial_transport_read
-	);
+
     gpio_init(6);
     gpio_set_dir(6, GPIO_OUT);
     gpio_put(6, 1);
@@ -106,91 +103,116 @@ int main(){
     msg.data = check;
     int new_value, delta, old_value = 0;
 
-    allocator = rcl_get_default_allocator();
+    #if ROS_MODE
+        rmw_uros_set_custom_transport(
+            true,
+            NULL,
+            pico_serial_transport_open,
+            pico_serial_transport_close,
+            pico_serial_transport_write,
+            pico_serial_transport_read
+        );
+        allocator = rcl_get_default_allocator();
 
-    // Wait for agent successful ping for 2 minutes.
-    const int timeout_ms = 1000; 
-    const uint8_t attempts = 120;
+        // Wait for agent successful ping for 2 minutes.
+        const int timeout_ms = 1000; 
+        const uint8_t attempts = 120;
 
-    rcl_ret_t ret = rmw_uros_ping_agent(timeout_ms, attempts);
-    if (ret != RCL_RET_OK){
-        // Unreachable agent, exiting program.
-        return ret;
-    }
+        rcl_ret_t ret = rmw_uros_ping_agent(timeout_ms, attempts);
+        if (ret != RCL_RET_OK){
+            // Unreachable agent, exiting program.
+            return ret;
+        }
 
-    rclc_support_init(&support, 0, NULL, &allocator);
-    // std msg currently used for debugging : motor speeds
-    rclc_node_init_default(&node, "pico_node", "", &support);
+        rclc_support_init(&support, 0, NULL, &allocator);
+        // std msg currently used for debugging : motor speeds
+        rclc_node_init_default(&node, "pico_node", "", &support);
 
-    rclc_publisher_init_default(
-        &publisher,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-        "pico_publisher");
-
-
-    rclc_publisher_init_default(
-        &publisher_imu,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
-
-        "pico_imu");
-
-    rclc_publisher_init_default(
-        &publisher_twist,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
-        "pico_twist");
-    
-    rclc_publisher_init_default(
-        &publisher_odomoter,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs,msg, Odometry),
-        "pico_odometry");
-
-    // subscriber for cmdvel
-	rclc_subscription_init_best_effort(&pong_subscriber,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
-        "/cmd_vel");
+        rclc_publisher_init_default(
+            &publisher,
+            &node,
+            ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+            "pico_publisher");
 
 
-	rclc_executor_init(&executor, &support.context,
-        4,
-        &allocator);
+        rclc_publisher_init_default(
+            &publisher_imu,
+            &node,
+            ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
 
-    // timer for mtoor controll
-    rclc_timer_init_default(
-        &timer,
-        &support,
-        RCL_MS_TO_NS(1),
-        timer_callback);
+            "pico_imu");
 
-    rcl_ret_t rc = rclc_timer_init_default(
-        &timer2,
-        &support,
-        RCL_MS_TO_NS(1000),
-        timer2_callback);
+        rclc_publisher_init_default(
+            &publisher_twist,
+            &node,
+            ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
+            "pico_twist");
+        
+        rclc_publisher_init_default(
+            &publisher_odomoter,
+            &node,
+            ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs,msg, Odometry),
+            "pico_odometry");
 
-    rclc_timer_init_default(
-        &timer3,
-        &support,
-        RCL_MS_TO_NS(10),
-        timer3_callback);
-	rclc_executor_add_timer(&executor, &timer);
-    rclc_executor_add_timer(&executor, &timer2);
-    rclc_executor_add_timer(&executor, &timer3);
-    rclc_executor_add_subscription(&executor,
-        &pong_subscriber,
-        &geo_msg,
-        &pong_subscription_callback,
-        ON_NEW_DATA);
+        // subscriber for cmdvel
+        rclc_subscription_init_best_effort(&pong_subscriber,
+            &node,
+            ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg, Twist),
+            "/cmd_vel");
 
 
+        rclc_executor_init(&executor, &support.context,
+            4,
+            &allocator);
+
+        // timer for mtoor controll
+        rclc_timer_init_default(
+            &timer,
+            &support,
+            RCL_MS_TO_NS(1),
+            timer_callback);
+
+        rcl_ret_t rc = rclc_timer_init_default(
+            &timer2,
+            &support,
+            RCL_MS_TO_NS(1000),
+            timer2_callback);
+
+        rclc_timer_init_default(
+            &timer3,
+            &support,
+            RCL_MS_TO_NS(10),
+            timer3_callback);
+        rclc_executor_add_timer(&executor, &timer);
+        rclc_executor_add_timer(&executor, &timer2);
+        rclc_executor_add_timer(&executor, &timer3);
+        rclc_executor_add_subscription(&executor,
+            &pong_subscriber,
+            &geo_msg,
+            &pong_subscription_callback,
+            ON_NEW_DATA);
+
+    #else    
+    stdio_init_all();
+    update_setpoint(0.00,0);
+
+    #endif
 
     while (true)
     {
-        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+
+        #if ROS_MODE
+            rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+        #else
+        uint64_t current_time = time_us_64();
+        if (current_time - last_trigger_time >= timer_interval_us) {
+            cacluate_motor_stats(current_time - last_trigger_time );
+            last_trigger_time = current_time;
+        }
+
+        
+        #endif
+        
     }
     return 0;
 }
@@ -232,33 +254,41 @@ void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){
     publish_imu_raw(); 
 }
 
-void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
-
-
+void cacluate_motor_stats( int64_t last_call_time)
+{
     
     test_A = get_encoder_count_A();
     test_B = get_encoder_count_B();
     reset_encoders();
+    time_test =  last_call_time/1000000.0f;
+    calc_stats(time_test, &odo_vals,test_A,test_B, &motorStatsA, &motorStatsB );
+    controlMotorsPID(time_test);
+}
+void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
+
+    cacluate_motor_stats(last_call_time);
     msg.data = test_A;
     rcl_publish(&publisher,&msg,NULL);
-    time_test =  last_call_time/1000000.0f;
     odo_msg.pose.pose.orientation.w = time_test;
-    calc_stats(time_test, &odo_vals,test_A,test_B, &motorStatsA, &motorStatsB );
-
+    
     publish_odo(last_call_time);
-    controlMotorsPID(time_test);
+
     
 }
 
+void update_setpoint(double x, double z)
+{
+    left_speed_target =  x - 0.5f*z*0.2;
+    right_speed_target = x + 0.5f*z*0.2;
+    pid_set_setpoint(&motorStatsA.pid, left_speed_target);
+    pid_set_setpoint(&motorStatsB.pid, right_speed_target);
+
+}
 void pong_subscription_callback(const void * msgin){
     
     rcl_publish(&publisher_twist, &geo_msg, NULL);
-    left_speed_target =  geo_msg.linear.x - 0.5f*geo_msg.angular.z*0.2;
-    right_speed_target = geo_msg.linear.x + 0.5f*geo_msg.angular.z*0.2;
-    pid_set_setpoint(&motorStatsB.pid, right_speed_target);
-    pid_set_setpoint(&motorStatsA.pid, left_speed_target);
 
-    
+    update_setpoint(geo_msg.linear.x,geo_msg.angular.z);
 
     printf("turtle %f\n", geo_msg.linear.x);
 }
@@ -342,18 +372,26 @@ void publish_imu_raw() {
 
 int controlMotorsPID(float dt)
 {
+    static bool headersPrinted = false;
+    // if (!headersPrinted) {
+    //     printf("Time, Motor, PID Output, PWM, Velocity, KP, KI, KD\n");
+    //     headersPrinted = true;
+    // }
+
     float outputA = pid_update(&motorStatsA.pid, motorStatsA.velocity, dt);
     float pwmA =  fabs(outputA);
-    if (pwmA > 100.0f)
-        pwmA = 100.0f;
+    if (pwmA > 100.0f) pwmA = 100.0f;
     
     float outputB = pid_update(&motorStatsB.pid, motorStatsB.velocity, dt);
     float pwmB = fabs(outputB);
-    if (pwmB > 100.0f)
-        pwmB = 100.0f;
+    if (pwmB > 100.0f) pwmB = 100.0f;
 
-    //printMotorStats(motorStatsA);
-    //printMotorStats(motorStatsB);
+    // Assuming `getCurrentTime()` is a function that returns the current time in milliseconds or another unit
+    
+
+    printf("%f, A, %f, %f, %f, %f\n", dt, outputA, pwmA, motorStatsA.velocity,left_speed_target);
+    printf("%f, B, %f, %f, %f, %f\n", dt, outputB, pwmB, motorStatsB.velocity, right_speed_target);
+
     controlLeftMotor(left_speed_target, pwmA);
     controlRightMotor(right_speed_target, pwmB);
 

@@ -5,7 +5,7 @@
 // Constants for GPIO
 #define HIGH 1
 #define LOW 0
-
+void set_motor_dir(float speed, MotorPins motor); 
 // Define Motor Pins structure
 MotorPins motorB;  // Instance of MotorPins structure for Motor B
 MotorPins motorA;  // Instance of MotorPins structure for Motor A
@@ -51,24 +51,24 @@ void init_motors(uint PWMB, uint BIN1, uint BIN2, uint PWMA, uint AIN1, uint AIN
     motorB.motor_pwm_val = 0;
 }
 
-// Function to control left motor
-int controlLeftMotor(float dir, int pwm) {
-    set_motor_dir(dir, motorB);  // Set direction of Motor B
-    pwm_set_freq_duty(motorB.SLICE, motorB.CHANNEL, 10000, pwm);  // Set PWM duty cycle for Motor B
-}
-
 // Function to control right motor
 int controlRightMotor(float dir, int pwm) {
     set_motor_dir(dir, motorA);  // Set direction of Motor A
     pwm_set_freq_duty(motorA.SLICE, motorA.CHANNEL, 10000, pwm);  // Set PWM duty cycle for Motor A
 }
 
+// Function to control left motor
+int controlLeftMotor(float dir, int pwm) {
+    set_motor_dir(dir, motorB);  // Set direction of Motor B
+    pwm_set_freq_duty(motorB.SLICE, motorB.CHANNEL, 10000, pwm);  // Set PWM duty cycle for Motor B
+}
+
 // Function to set motor direction based on speed
 void set_motor_dir(float speed, MotorPins motor) {
-    if (speed == 0) {
+    if (speed < 0.000001f && speed > -0.000001f) {
         gpio_put(motor.IN1_PIN, HIGH);  // Set input 1 of motor to HIGH
         gpio_put(motor.IN2_PIN, HIGH);  // Set input 2 of motor to HIGH
-    } else if (speed > 0) {
+    } else if (speed > 0.000001f) {
         gpio_put(motor.IN1_PIN, HIGH);  // Set input 1 of motor to HIGH
         gpio_put(motor.IN2_PIN, LOW);   // Set input 2 of motor to LOW
     } else {

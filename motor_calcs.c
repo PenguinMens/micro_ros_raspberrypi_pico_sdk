@@ -48,14 +48,15 @@ void calc_stats(float time, Odometry_values *vals, int32_t ENCODER1_TICKS, int32
     READINGS[INDEX] = VALUE;            // Add the newest reading to the window
     SUM = SUM + VALUE;                  // Add the newest reading to the sum
     INDEX = (INDEX + 1) % WINDOW_SIZE;  // Increment the index, and wrap to 0 if it exceeds the window size
-    AVERAGED = SUM / WINDOW_SIZE;       // Calculate the average velocity
-
+    //AVERAGED = SUM / WINDOW_SIZE;       // Calculate the average velocity
+    AVERAGED2 = v1;
     SUM2 = SUM2 - READINGS2[INDEX2];       // Remove the oldest entry from the sum
     VALUE2 = v2;                           // Read the next sensor value
     READINGS2[INDEX2] = VALUE2;            // Add the newest reading to the window
     SUM2 = SUM2 + VALUE2;                  // Add the newest reading to the sum
     INDEX2 = (INDEX2 + 1) % WINDOW_SIZE;   // Increment the index, and wrap to 0 if it exceeds the window size
-    AVERAGED2 = SUM2 / WINDOW_SIZE;        // Calculate the average velocity
+    //AVERAGED2 = SUM2 / WINDOW_SIZE;        // Calculate the average velocity
+    AVERAGED2 = v2;
 
     // Update motor statistics with averaged velocity values
     motorStatsA->velocity = AVERAGED;
