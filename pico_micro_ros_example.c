@@ -22,13 +22,14 @@
 #include "pico_uart_transports.h"
 #include "hardware/pio.h"
 #include <inttypes.h>
+#include "motor.h"
+
 #define ROS_MODE 0
 
 float time_test = 0.0f;
 float left_speed_target = 0;
 float right_speed_target =0;
-MotorStats motorStatsA;
-MotorStats motorStatsB;
+
 int32_t test_A = 0;
 int32_t test_B = 0;
 const uint LED_PIN = 25;
@@ -75,7 +76,8 @@ void publish_odo();
 int data = 0;
 //flag for mtoor direction tests
 int flag = 1;
-
+Motor leftMotor;
+Motor rightMotor;
 uint64_t last_trigger_time = 0;
 uint64_t last_trigger_time2 = 0;
 uint64_t last_trigger_time3 = 0;
@@ -91,9 +93,10 @@ int main(){
     float kp =  100;
     float ki =20;  
     float kd = 1;
-    init_motors(15,16,17,14,18,19);
-    pid_init(&motorStatsA.pid, kp, ki, kd, 0);
-    pid_init(&motorStatsB.pid, kp, ki, kd, 0);
+
+    init_motor(&leftMotor,MOTOR1_PWM, MOTOR1_IN1, MOTOR1_IN2,  MOTOR1_ENCODER, kp, ki, kd, 0);
+    init_motor(&rightMotor,MOTOR2_PWM, MOTOR2_IN1, MOTOR2_IN2, MOTOR2_ENCODER, kp, ki, kd, 0);
+    // init_motors(15,16,17,14,18,19);
     const uint PIN_AB = 20;
     const uint PIN_CD = 12;
 
@@ -209,8 +212,9 @@ int main(){
         #else
         uint64_t current_time = time_us_64();
         if (current_time - last_trigger_time >= timer_interval_us) {
-            cacluate_motor_stats(current_time - last_trigger_time );
+           cacluate_motor_stats(current_time - last_trigger_time );
             last_trigger_time = current_time;
+    
             printf("test");
             i++;
             if(i > 200)
@@ -275,7 +279,7 @@ void cacluate_motor_stats( uint64_t last_call_time)
     time_test =  last_call_time/1000.0f;
 
     //printf("%" PRIu64 "\n", last_call_time);
-    calc_stats(time_test, &odo_vals,test_A,test_B, &motorStatsA, &motorStatsB );
+    calc_stats(time_test, &odo_vals,test_A,test_B, &leftMotor.motorStats, &rightMotor.motorStats );
     controlMotorsPID(time_test);
 }
 void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
@@ -295,8 +299,8 @@ void update_setpoint(double x, double z)
 {
     left_speed_target =  x - 0.5f*z*0.2;
     right_speed_target = x + 0.5f*z*0.2;
-    pid_set_setpoint(&motorStatsA.pid, left_speed_target);
-    pid_set_setpoint(&motorStatsB.pid, right_speed_target);
+    pid_set_setpoint(&leftMotor.motorStats.pid, left_speed_target);
+    pid_set_setpoint(&rightMotor.motorStats.pid, right_speed_target);
 
 }
 void pong_subscription_callback(const void * msgin){
@@ -362,8 +366,8 @@ void publish_odo(uint64_t current_time)
     odo_msg.twist.twist.linear.y = left_speed_target;
     odo_msg.twist.twist.linear.z = right_speed_target;
     // set the angular velocity 
-    odo_msg.twist.twist.angular.x = motorStatsA.rps;
-    odo_msg.twist.twist.angular.y = motorStatsB.rps;
+    odo_msg.twist.twist.angular.x = leftMotor.motorStats.rps;
+    odo_msg.twist.twist.angular.y = rightMotor.motorStats.rps;
     odo_msg.twist.twist.angular.z = odo_vals.angular_velocity;
     rcl_publish(&publisher_odomoter, &odo_msg, NULL);
 }
@@ -393,22 +397,22 @@ int controlMotorsPID(float dt)
     //     headersPrinted = true;
     // }
 
-    float outputA = pid_update(&motorStatsA.pid, motorStatsA.velocity, dt);
+    float outputA = pid_update(&leftMotor.motorStats.pid, leftMotor.motorStats.velocity, dt);
     float pwmA =  fabs(outputA);
     if (pwmA > 100.0f) pwmA = 100.0f;
     
-    float outputB = pid_update(&motorStatsB.pid, motorStatsB.velocity, dt);
+    float outputB = pid_update(&rightMotor.motorStats.pid, rightMotor.motorStats.velocity, dt);
     float pwmB = fabs(outputB);
     if (pwmB > 100.0f) pwmB = 100.0f;
     
 
     // Assuming `getCurrentTime()` is a function that returns the current time in milliseconds or another unit
 
-    printf("%f, A, %f, %f, %f, %f, %f ,%d\n", dt, outputA, pwmA, motorStatsA.velocity,left_speed_target,  odo_vals.linear_velocity, test_A);
-    // printf("%f, B, %f, %f, %f, %f, %f\n", dt, outputB, pwmB, motorStatsB.velocity, right_speed_target,  odo_vals.linear_velocity);
-    printf("%f, B, %f, %f, %f, %f, %f, %d\n", dt, outputB, pwmB, motorStatsB.velocity,  right_speed_target,  odo_vals.linear_velocity, test_B);
-    controlLeftMotor(outputA, pwmA);
-    controlRightMotor(outputB, pwmB);
+    printf("%f, A, %f, %f, %f, %f, %f ,%d\n", dt, outputA, pwmA, leftMotor.motorStats.velocity,left_speed_target,  odo_vals.linear_velocity, test_A);
+    // printf("%f, B, %f, %f, %f, %f, %f\n", dt, outputB, pwmB, rightMotor.motorStats.velocity, right_speed_target,  odo_vals.linear_velocity);
+   printf("%f, B, %f, %f, %f, %f, %f, %d\n", dt, outputB, pwmB, rightMotor.motorStats.velocity,  right_speed_target,  odo_vals.linear_velocity, test_B);
+    control_motor(leftMotor,outputB, pwmB);
+    control_motor(rightMotor,outputA, pwmA);
 
     return 0;
 }
