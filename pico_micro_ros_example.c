@@ -22,7 +22,7 @@
 #include "pico_uart_transports.h"
 #include "hardware/pio.h"
 #include <inttypes.h>
-#define ROS_MODE 1
+#define ROS_MODE 0
 
 float time_test = 0.0f;
 float left_speed_target = 0;
@@ -88,14 +88,14 @@ int main(){
     gpio_set_dir(6, GPIO_OUT);
     gpio_put(6, 1);
     init_i2c();
-    float kp =  250;
-    float ki =50;  
+    float kp =  100;
+    float ki =20;  
     float kd = 1;
-    init_motors(15,17,16,14,19,18);
+    init_motors(15,16,17,14,18,19);
     pid_init(&motorStatsA.pid, kp, ki, kd, 0);
     pid_init(&motorStatsB.pid, kp, ki, kd, 0);
-    const uint PIN_AB = 12;
-    const uint PIN_CD = 20;
+    const uint PIN_AB = 20;
+    const uint PIN_CD = 12;
 
     init_PIO_encoder(PIN_AB, PIN_CD, ENCODERA,ENCODERB);
     mpu6050  = mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_GND);
@@ -162,14 +162,14 @@ int main(){
 
 
         rclc_executor_init(&executor, &support.context,
-            4,
+            5,
             &allocator);
 
         // timer for mtoor controll
         rclc_timer_init_default(
             &timer,
             &support,
-            RCL_MS_TO_NS(1),
+            RCL_MS_TO_NS(20),
             timer_callback);
 
         rcl_ret_t rc = rclc_timer_init_default(
@@ -181,7 +181,7 @@ int main(){
         rclc_timer_init_default(
             &timer3,
             &support,
-            RCL_MS_TO_NS(10),
+            RCL_MS_TO_NS(20),
             timer3_callback);
         rclc_executor_add_timer(&executor, &timer);
         rclc_executor_add_timer(&executor, &timer2);
@@ -193,21 +193,33 @@ int main(){
             ON_NEW_DATA);
 
     #else    
+     float setpoint = 0.05f;
+     int i =0;
     stdio_init_all();
-    update_setpoint(0.1,0);
+
+    
 
     #endif
-
+   
     while (true)
     {
 
         #if ROS_MODE
-            rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+            rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
         #else
         uint64_t current_time = time_us_64();
         if (current_time - last_trigger_time >= timer_interval_us) {
             cacluate_motor_stats(current_time - last_trigger_time );
             last_trigger_time = current_time;
+            printf("test");
+            i++;
+            if(i > 200)
+            {
+                update_setpoint(setpoint,0);
+                // update_setpoint(setpoint,0);
+                // setpoint = setpoint + 0.01;
+                i = 0;
+            }
         }
 
         
@@ -230,28 +242,28 @@ int init_i2c(){
 
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time){	
 
-    if (timer == NULL) {
-        return;
-    }
-    uint64_t current_time = time_us_64();
+    // if (timer == NULL) {
+    //     return;
+    // }
+    // uint64_t current_time = time_us_64();
     
-    if (current_time - last_trigger_time >= timer_interval_us) {
-        //msg.data =controlMotors(geo_msg.linear.x, geo_msg.angular.z);
-        //rcl_publish(&publisher, &msg, NULL);
-        last_trigger_time = current_time;
+    // if (current_time - last_trigger_time >= timer_interval_us) {
+    //     //msg.data =controlMotors(geo_msg.linear.x, geo_msg.angular.z);
+    //     //rcl_publish(&publisher, &msg, NULL);
+    //     last_trigger_time = current_time;
 
-    }
+    // }
 
 
 }
 
 void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){	
 
-    if (timer == NULL) {
-        return;
-    }
-    mpu6050_event(&mpu6050);
-    publish_imu_raw(); 
+    // if (timer == NULL) {
+    //     return;
+    // }
+    // mpu6050_event(&mpu6050);
+    // publish_imu_raw(); 
 }
 
 void cacluate_motor_stats( uint64_t last_call_time)
@@ -268,8 +280,9 @@ void cacluate_motor_stats( uint64_t last_call_time)
 }
 void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
 
-    cacluate_motor_stats(last_call_time);
-    msg.data = test_A;
+
+    cacluate_motor_stats(last_call_time/1000.0f);
+    msg.data = last_call_time;
     rcl_publish(&publisher,&msg,NULL);
     odo_msg.pose.pose.orientation.w = time_test;
     
@@ -288,11 +301,11 @@ void update_setpoint(double x, double z)
 }
 void pong_subscription_callback(const void * msgin){
     
-    rcl_publish(&publisher_twist, &geo_msg, NULL);
-
-    update_setpoint(geo_msg.linear.x,geo_msg.angular.z);
-
-    printf("turtle %f\n", geo_msg.linear.x);
+   rcl_publish(&publisher_twist, &geo_msg, NULL);
+    // update_setpoint(0.1 ,0.1);
+   update_setpoint(geo_msg.linear.x,geo_msg.angular.z);
+    
+    // printf("turtle %f\n", geo_msg.linear.x);
 }
 
 
@@ -390,7 +403,6 @@ int controlMotorsPID(float dt)
     
 
     // Assuming `getCurrentTime()` is a function that returns the current time in milliseconds or another unit
-    
 
     printf("%f, A, %f, %f, %f, %f, %f ,%d\n", dt, outputA, pwmA, motorStatsA.velocity,left_speed_target,  odo_vals.linear_velocity, test_A);
     // printf("%f, B, %f, %f, %f, %f, %f\n", dt, outputB, pwmB, motorStatsB.velocity, right_speed_target,  odo_vals.linear_velocity);

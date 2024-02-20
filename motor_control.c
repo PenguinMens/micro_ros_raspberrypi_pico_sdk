@@ -54,14 +54,14 @@ void init_motors(uint PWMB, uint BIN1, uint BIN2, uint PWMA, uint AIN1, uint AIN
 // Function to control right motor
 int controlRightMotor(float dir, float pwm) {
     set_motor_dir(dir, motorA);  // Set direction of Motor A
-    pwm_set_freq_duty(motorA.SLICE, motorA.CHANNEL, 10000, pwm);  // Set PWM duty cycle for Motor A
+    pwm_set_freq_duty(motorA.SLICE, motorA.CHANNEL, 50000, pwm);  // Set PWM duty cycle for Motor A
      printf("RIGHT MOTORO %f,%f\n", dir,pwm);
 }
 
 // Function to control left motor
 int controlLeftMotor(float dir, float pwm) {
     set_motor_dir(dir, motorB);  // Set direction of Motor B
-    pwm_set_freq_duty(motorB.SLICE, motorB.CHANNEL, 10000, pwm);  // Set PWM duty cycle for Motor B
+    pwm_set_freq_duty(motorB.SLICE, motorB.CHANNEL, 50000, pwm);  // Set PWM duty cycle for Motor B
      printf("LEFT MOTORO %f,%f\n", dir,pwm);
 }
 

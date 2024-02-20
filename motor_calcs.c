@@ -63,19 +63,20 @@ void calc_stats(float time, Odometry_values *vals, int32_t ENCODER1_TICKS, int32
     float v2 = (rmp_2 * 0.10472f * encoder_setup.WHEEL_DIAMETER);
 
     // Moving average calculation for motor velocities
-    SUM = SUM - READINGS[INDEX];        // Remove the oldest entry from the sum
-    VALUE = v1;                         // Read the next sensor value
-    READINGS[INDEX] = VALUE;            // Add the newest reading to the window
-    SUM = SUM + VALUE;                  // Add the newest reading to the sum
-    INDEX = (INDEX + 1) % WINDOW_SIZE;  // Increment the index, and wrap to 0 if it exceeds the window size
+    // SUM = SUM - READINGS[INDEX];        // Remove the oldest entry from the sum
+    // VALUE = v1;                         // Read the next sensor value
+    // READINGS[INDEX] = VALUE;            // Add the newest reading to the window
+    // SUM = SUM + VALUE;                  // Add the newest reading to the sum
+    // INDEX = (INDEX + 1) % WINDOW_SIZE;  // Increment the index, and wrap to 0 if it exceeds the window size
     //AVERAGED = SUM / WINDOW_SIZE;       // Calculate the average velocity
     AVERAGED = v1;
-    SUM2 = SUM2 - READINGS2[INDEX2];       // Remove the oldest entry from the sum
-    VALUE2 = v2;                           // Read the next sensor value
-    READINGS2[INDEX2] = VALUE2;            // Add the newest reading to the window
-    SUM2 = SUM2 + VALUE2;                  // Add the newest reading to the sum
-    INDEX2 = (INDEX2 + 1) % WINDOW_SIZE;   // Increment the index, and wrap to 0 if it exceeds the window size
-    //AVERAGED2 = SUM2 / WINDOW_SIZE;        // Calculate the average velocity
+
+    // SUM2 = SUM2 - READINGS2[INDEX2];       // Remove the oldest entry from the sum
+    // VALUE2 = v2;                           // Read the next sensor value
+    // READINGS2[INDEX2] = VALUE2;            // Add the newest reading to the window
+    // SUM2 = SUM2 + VALUE2;                  // Add the newest reading to the sum
+    // INDEX2 = (INDEX2 + 1) % WINDOW_SIZE;   // Increment the index, and wrap to 0 if it exceeds the window size
+    // //AVERAGED2 = SUM2 / WINDOW_SIZE;        // Calculate the average velocity
     AVERAGED2 = v2;
 
     // Update motor statistics with averaged velocity values
@@ -88,7 +89,10 @@ void calc_stats(float time, Odometry_values *vals, int32_t ENCODER1_TICKS, int32
 
 
     // Calculate new position and orientation based on velocities
-    vals->x += vals->linear_velocity * cos(vals->theta) * time / 1000.0f;
-    vals->y += vals->linear_velocity * sin(vals->theta) * time / 1000.0f;
-    vals->theta += vals->angular_velocity * time / 1000.0f;
+    // vals->x += vals->linear_velocity * cos(vals->theta) * time / 1000.0f;
+    // vals->y += vals->linear_velocity * sin(vals->theta) * time / 1000.0f;
+    // vals->theta += vals->angular_velocity * time / 1000.0f;
+    vals->x = 0;
+    vals->y = 0;
+    vals->theta =0;
 }

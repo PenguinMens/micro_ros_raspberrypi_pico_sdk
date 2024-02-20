@@ -19,7 +19,7 @@ float pid_update(PIDController* pid, float input, float dt_ms) {
     pid->integral = pid->integral + error * dt;
     float derivative = (error - pid->previous_error) / dt;
     float output = pid->Kp * error + pid->Ki * pid->integral + pid->Kd * derivative;
-   // printf("%f,%f,%f\n", error,pid->integral, derivative);
+   printf("%f,%f,%f\n", error,pid->integral, derivative);
     // Update previous_error for next iteration
     pid->previous_error = error;
 
@@ -28,7 +28,7 @@ float pid_update(PIDController* pid, float input, float dt_ms) {
 // Set new setpoint for PID controller
 void pid_set_setpoint(PIDController* pid, float setpoint) {
     pid->setpoint = setpoint;
-    pid_reset(pid);
+    //pid_reset(pid);
 }
 
 // Reset PID controller state
