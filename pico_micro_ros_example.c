@@ -90,16 +90,16 @@ int main(){
     gpio_set_dir(6, GPIO_OUT);
     gpio_put(6, 1);
     init_i2c();
-    float kp =  100;
-    float ki =20;  
-    float kd = 1;
-
+    float kp =  350;
+    float ki =50;  
+    float kd = 10;
+-
     init_motor(&leftMotor,MOTOR1_PWM, MOTOR1_IN1, MOTOR1_IN2,  MOTOR1_ENCODER, kp, ki, kd, 0);
     init_motor(&rightMotor,MOTOR2_PWM, MOTOR2_IN1, MOTOR2_IN2, MOTOR2_ENCODER, kp, ki, kd, 0);
     // init_motors(15,16,17,14,18,19);
     const uint PIN_AB = 20;
     const uint PIN_CD = 12;
-
+    // @todo fix this shit, needs to be put into motor.c
     init_PIO_encoder(PIN_AB, PIN_CD, ENCODERA,ENCODERB);
     mpu6050  = mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_GND);
     int check = init_mpu6050_vals();
@@ -196,7 +196,7 @@ int main(){
             ON_NEW_DATA);
 
     #else    
-     float setpoint = 0.05f;
+     float setpoint = 0.20f;
      int i =0;
     stdio_init_all();
 
@@ -221,7 +221,7 @@ int main(){
             {
                 update_setpoint(setpoint,0);
                 // update_setpoint(setpoint,0);
-                // setpoint = setpoint + 0.01;
+                 setpoint = setpoint + 0.01;
                 i = 0;
             }
         }
@@ -411,8 +411,8 @@ int controlMotorsPID(float dt)
     printf("%f, A, %f, %f, %f, %f, %f ,%d\n", dt, outputA, pwmA, leftMotor.motorStats.velocity,left_speed_target,  odo_vals.linear_velocity, test_A);
     // printf("%f, B, %f, %f, %f, %f, %f\n", dt, outputB, pwmB, rightMotor.motorStats.velocity, right_speed_target,  odo_vals.linear_velocity);
    printf("%f, B, %f, %f, %f, %f, %f, %d\n", dt, outputB, pwmB, rightMotor.motorStats.velocity,  right_speed_target,  odo_vals.linear_velocity, test_B);
-    control_motor(leftMotor,outputB, pwmB);
-    control_motor(rightMotor,outputA, pwmA);
+    control_motor( rightMotor,outputB, pwmB);
+    control_motor(leftMotor,outputA, pwmA);
 
     return 0;
 }
