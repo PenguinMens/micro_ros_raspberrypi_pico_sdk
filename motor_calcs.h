@@ -25,7 +25,7 @@ typedef struct {
     float x;                  // X-coordinate of the car's position (in meters)
     float y;                  // Y-coordinate of the car's position (in meters)
     float theta;              // Orientation of the car (in radians)
-    float linear_velocity;    // Linear velocity of the car (in m/s)
+    float linear_velocity;    // Linear velocity of the motor (in m/s)
     float angular_velocity;   // Angular velocity of the car (in rad/s)
 } Odometry_values;
 
@@ -33,6 +33,7 @@ typedef struct {
 typedef struct MotorStats {
     float velocity;           // Current velocity of the motor
     float rps;                // Rotations per second of the motor
+    float motorPWM;           // PWM value for motor control
     PIDController pid;        // PID controller for motor control
 } MotorStats;
 

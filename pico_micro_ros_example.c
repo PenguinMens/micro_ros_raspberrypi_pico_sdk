@@ -12,6 +12,7 @@
 #include <rmw_microros/rmw_microros.h>
 #define PICO_BOOT_STAGE2_CHOOSE_GENERIC_03H   1
 #include "custom_pwm.h"
+#include "hardware/pwm.h"
 #include "motor_control.h"
 #include "motor_calcs.h"
 #include "motor_pid.h"
@@ -23,7 +24,8 @@
 #include "hardware/pio.h"
 #include <inttypes.h>
 #include "motor.h"
-
+#include <stdio.h>
+#include "tusb.h" // TinyUSB header
 #define ROS_MODE 0
 
 float time_test = 0.0f;
@@ -66,12 +68,14 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time);
 void pong_subscription_callback(const void * msgin);
 int controlMotorsPID(float dt);
 void update_setpoint(double x, double z);
-void cacluate_motor_stats(uint64_t last_call_time);
+void motor_iteration(uint64_t last_call_time);
 int init_mpu6050_vals();
 int init_i2c();
 void publish_imu_raw();
 void timer2_callback(rcl_timer_t * timer, int64_t last_call_time);
 void timer3_callback(rcl_timer_t * timer, int64_t last_call_time);
+void sendMotorDataCSV();
+
 void publish_odo();
 int data = 0;
 //flag for mtoor direction tests
@@ -81,11 +85,16 @@ Motor rightMotor;
 uint64_t last_trigger_time = 0;
 uint64_t last_trigger_time2 = 0;
 uint64_t last_trigger_time3 = 0;
-uint64_t timer_interval_us = 20000;  // interval in microseconds (1 second)
+uint64_t timer_interval_us = 20000;  // interval in microseconds 20ms
+uint32_t duration = 0;
 const uint ENCODERA =0;
 const uint ENCODERB = 1;
+bool generic_flag = 0;
 int main(){
-
+    stdio_init_all(); // Initialize all configured stdio types
+    while (!tud_cdc_connected()) {
+        sleep_ms(250); // Wait for USB connection
+    }
     gpio_init(6);
     gpio_set_dir(6, GPIO_OUT);
     gpio_put(6, 1);
@@ -93,12 +102,12 @@ int main(){
     float kp =  350;
     float ki =50;  
     float kd = 10;
--
+
     init_motor(&leftMotor,MOTOR1_PWM, MOTOR1_IN1, MOTOR1_IN2,  MOTOR1_ENCODER, kp, ki, kd, 0);
     init_motor(&rightMotor,MOTOR2_PWM, MOTOR2_IN1, MOTOR2_IN2, MOTOR2_ENCODER, kp, ki, kd, 0);
     // init_motors(15,16,17,14,18,19);
-    const uint PIN_AB = 20;
-    const uint PIN_CD = 12;
+    const uint PIN_AB = MOTOR1_ENCODER;
+    const uint PIN_CD = MOTOR2_ENCODER;
     // @todo fix this shit, needs to be put into motor.c
     init_PIO_encoder(PIN_AB, PIN_CD, ENCODERA,ENCODERB);
     mpu6050  = mpu6050_init(i2c_default, MPU6050_ADDRESS_A0_GND);
@@ -196,9 +205,9 @@ int main(){
             ON_NEW_DATA);
 
     #else    
-     float setpoint = 0.20f;
+     float setpoint = 0.05f;
      int i =0;
-    stdio_init_all();
+
 
     
 
@@ -212,20 +221,37 @@ int main(){
         #else
         uint64_t current_time = time_us_64();
         if (current_time - last_trigger_time >= timer_interval_us) {
-           cacluate_motor_stats(current_time - last_trigger_time );
-            last_trigger_time = current_time;
-    
-            printf("test");
-            i++;
-            if(i > 200)
+            if(generic_flag)
             {
-                update_setpoint(setpoint,0);
-                // update_setpoint(setpoint,0);
-                 setpoint = setpoint + 0.01;
-                i = 0;
-            }
-        }
+                i++;
+                if(i > 200)
+                {
+                    // update_setpoint(setpoint,0);
+                    // update_setpoint(setpoint,0);
+                    // setpoint = setpoint + 0.01;
+                    i = 0;
+                    update_setpoint(0,0);
+                    generic_flag = 0;
+                    printf("end\n");
+                }
+                motor_iteration(current_time - last_trigger_time );
+                last_trigger_time = current_time;
+                duration = duration+( timer_interval_us / 1000);
 
+               
+            }
+
+
+      
+
+        }
+         if (tud_cdc_available()) { // Check if data is available to read
+            uint8_t buf[64];
+            uint32_t count = tud_cdc_read(buf, sizeof(buf)); // Read the data into buf
+            printf("start\n");
+            update_setpoint(setpoint,0);
+            generic_flag = 1;
+        }
         
         #endif
         
@@ -270,7 +296,7 @@ void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){
     // publish_imu_raw(); 
 }
 
-void cacluate_motor_stats( uint64_t last_call_time)
+void motor_iteration( uint64_t last_call_time) // probaby makes more sense to call this a motor iteration
 {
     
     test_A = get_encoder_count_A();
@@ -279,13 +305,13 @@ void cacluate_motor_stats( uint64_t last_call_time)
     time_test =  last_call_time/1000.0f;
 
     //printf("%" PRIu64 "\n", last_call_time);
-    calc_stats(time_test, &odo_vals,test_A,test_B, &leftMotor.motorStats, &rightMotor.motorStats );
+    calc_stats(time_test, &odo_vals,test_A,test_B, &leftMotor.motorStats, &rightMotor.motorStats ); 
     controlMotorsPID(time_test);
 }
 void timer3_callback(rcl_timer_t * timer, int64_t last_call_time){
 
 
-    cacluate_motor_stats(last_call_time/1000.0f);
+    motor_iteration(last_call_time/1000.0f);
     msg.data = last_call_time;
     rcl_publish(&publisher,&msg,NULL);
     odo_msg.pose.pose.orientation.w = time_test;
@@ -299,8 +325,11 @@ void update_setpoint(double x, double z)
 {
     left_speed_target =  x - 0.5f*z*0.2;
     right_speed_target = x + 0.5f*z*0.2;
+
     pid_set_setpoint(&leftMotor.motorStats.pid, left_speed_target);
     pid_set_setpoint(&rightMotor.motorStats.pid, right_speed_target);
+    
+
 
 }
 void pong_subscription_callback(const void * msgin){
@@ -406,13 +435,68 @@ int controlMotorsPID(float dt)
     if (pwmB > 100.0f) pwmB = 100.0f;
     
 
-    // Assuming `getCurrentTime()` is a function that returns the current time in milliseconds or another unit
+    
 
-    printf("%f, A, %f, %f, %f, %f, %f ,%d\n", dt, outputA, pwmA, leftMotor.motorStats.velocity,left_speed_target,  odo_vals.linear_velocity, test_A);
-    // printf("%f, B, %f, %f, %f, %f, %f\n", dt, outputB, pwmB, rightMotor.motorStats.velocity, right_speed_target,  odo_vals.linear_velocity);
-   printf("%f, B, %f, %f, %f, %f, %f, %d\n", dt, outputB, pwmB, rightMotor.motorStats.velocity,  right_speed_target,  odo_vals.linear_velocity, test_B);
-    control_motor( rightMotor,outputB, pwmB);
-    control_motor(leftMotor,outputA, pwmA);
+//     printf("%f, A, %f, %f, %f, %f, %f ,%d\n", dt, outputA, pwmA, leftMotor.motorStats.velocity,left_speed_target,  odo_vals.linear_velocity, test_A);
+//     // printf("%f, B, %f, %f, %f, %f, %f\n", dt, outputB, pwmB, rightMotor.motorStats.velocity, right_speed_target,  odo_vals.linear_velocity);
+//    printf("%f, B, %f, %f, %f, %f, %f, %d\n", dt, outputB, pwmB, rightMotor.motorStats.velocity,  right_speed_target,  odo_vals.linear_velocity, test_B);
 
+    if(left_speed_target == 0 && right_speed_target == 0){
+        outputB = 0;
+        pwmB = 0;
+        outputA = 0;
+        pwmA = 0;
+        pid_reset(&rightMotor.motorStats.pid);
+        pid_reset(&leftMotor.motorStats.pid);
+    }
+    control_motor(rightMotor,0,0);
+    control_motor(leftMotor,0,0);
+    #if !ros_mode
+    {
+        //sendMotorDataCSV();
+    }
+    #endif
+
+    
     return 0;
+}
+
+void sendMotorDataCSV() {
+    // char buffer[128];
+    // snprintf(buffer, sizeof(buffer), "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+    //          leftMotor.motorStats.velocity,
+    //          leftMotor.motorStats.rps,
+    //          leftMotor.motorStats.pid.Kp,
+    //          leftMotor.motorStats.pid.Ki,
+    //          leftMotor.motorStats.pid.Kd,
+    //          leftMotor.motorStats.pid.setpoint,
+    //          leftMotor.motorStats.pid.error,
+    //          leftMotor.motorStats.pid.integral,
+    //          leftMotor.motorStats.pid.derivative,
+    //          leftMotor.motorStats.pid.previous_error);
+    // Serial.print(buffer);
+
+    printf("%s,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%lu\n",
+            "Left",
+            leftMotor.motorStats.velocity,
+            leftMotor.motorStats.rps,
+            leftMotor.motorStats.pid.setpoint,
+            leftMotor.motorStats.pid.error,
+            leftMotor.motorStats.pid.integral,
+            leftMotor.motorStats.pid.derivative,
+            leftMotor.motorStats.pid.previous_error,
+            duration
+            );
+            
+    printf("%s,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%lu\n",
+            "Right",
+            rightMotor.motorStats.velocity,
+            rightMotor.motorStats.rps,
+            rightMotor.motorStats.pid.setpoint,
+            rightMotor.motorStats.pid.error,
+            rightMotor.motorStats.pid.integral,
+            rightMotor.motorStats.pid.derivative,
+            rightMotor.motorStats.pid.previous_error,
+            duration
+            );         
 }

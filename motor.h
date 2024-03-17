@@ -7,7 +7,22 @@
 #include "custom_pwm.h"  // Include custom PWM functions
 // Define any necessary constants or macros here
 
+#define breakout 1
 
+#if defined(breakout)
+
+#define MOTOR1_PWM 15
+#define MOTOR1_IN1 17
+#define MOTOR1_IN2 16
+#define MOTOR1_ENCODER 12
+
+/*### MOTOR 2(right?) pin assignment   */
+#define MOTOR2_PWM 14
+#define MOTOR2_IN1 19
+#define MOTOR2_IN2 18
+#define MOTOR2_ENCODER 20
+
+#else // pico
 /*### MOTOR 1(left?) pin assignment   */
 #define MOTOR1_PWM 15
 #define MOTOR1_IN1 16
@@ -18,7 +33,12 @@
 #define MOTOR2_PWM 14
 #define MOTOR2_IN1 18
 #define MOTOR2_IN2 19
-#define MOTOR2_ENCODER 12
+#define MOTOR2_ENCODER 12 
+#endif // breakout
+
+
+
+
 
 
 

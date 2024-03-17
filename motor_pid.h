@@ -28,7 +28,7 @@ typedef struct {
  * @param Kp Proportional gain.
  * @param Ki Integral gain.
  * @param Kd Derivative gain.
- * @param setpoint Desired setpoint.
+ * @param setpoint Desired setpoint. 
  */
 void pid_init(PIDController* pid, float Kp, float Ki, float Kd, float setpoint);
 

@@ -29,14 +29,15 @@ void set_motor_dir(float speed, Motor motor);
 int control_motor(Motor motor, float dir, float pwm) {
     set_motor_dir(dir, motor);  // Set direction of Motor B
     pwm_set_freq_duty(motor.SLICE, motor.CHANNEL, 50000, pwm);  // Set PWM duty cycle for Motor B
-     printf("LEFT MOTORO %f,%f,%d,%d\n", dir,pwm,motor.SLICE,motor.CHANNEL);
 }
 
 // Function to set motor direction based on speed
 void set_motor_dir(float speed, Motor motor) {
+    printf("Speed: %f\n", speed);
     if (speed < 0.000001f && speed > -0.000001f) {
         gpio_put(motor.IN1_PIN, HIGH);  // Set input 1 of motor to HIGH
         gpio_put(motor.IN2_PIN, HIGH);  // Set input 2 of motor to HIGH
+        printf("STOP\n");
     } else if (speed > 0.000001f) {
         gpio_put(motor.IN1_PIN, HIGH);  // Set input 1 of motor to HIGH
         gpio_put(motor.IN2_PIN, LOW);   // Set input 2 of motor to LOW

@@ -5,7 +5,12 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 project(pico_micro_ros_example C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-
+include(FetchContent)
+FetchContent_Declare(ArduinoJson
+    GIT_REPOSITORY https://github.com/bblanchon/ArduinoJson.git
+    GIT_TAG        v7.0.3
+)
+FetchContent_MakeAvailable(ArduinoJson)
 pico_sdk_init()
 add_subdirectory(mpu6050)
 link_directories(libmicroros)
@@ -29,6 +34,7 @@ target_link_libraries(pico_micro_ros_example
     hardware_pio
     hardware_i2c
     haw_mpu6050
+    ArduinoJson
 )
 
 target_include_directories(pico_micro_ros_example PUBLIC
