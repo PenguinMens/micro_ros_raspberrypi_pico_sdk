@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include "tusb.h" // TinyUSB header
 #define ROS_MODE 0
-
+#define PWM_MAX 50.0f
 float time_test = 0.0f;
 float left_speed_target = 0;
 float right_speed_target =0;
@@ -234,7 +234,7 @@ int main(){
                     generic_flag = 0;
                     printf("end\n");
                 }
-                motor_iteration(current_time - last_trigger_time );
+                motor_iteration(timer_interval_us);
                 last_trigger_time = current_time;
                 duration = duration+( timer_interval_us / 1000);
 
@@ -250,6 +250,7 @@ int main(){
             uint32_t count = tud_cdc_read(buf, sizeof(buf)); // Read the data into buf
             printf("start\n");
             update_setpoint(setpoint,0);
+            last_trigger_time = current_time;
             generic_flag = 1;
         }
         
@@ -428,11 +429,11 @@ int controlMotorsPID(float dt)
 
     float outputA = pid_update(&leftMotor.motorStats.pid, leftMotor.motorStats.velocity, dt);
     float pwmA =  fabs(outputA);
-    if (pwmA > 100.0f) pwmA = 100.0f;
+    if (pwmA > PWM_MAX) pwmA = PWM_MAX;
     
     float outputB = pid_update(&rightMotor.motorStats.pid, rightMotor.motorStats.velocity, dt);
     float pwmB = fabs(outputB);
-    if (pwmB > 100.0f) pwmB = 100.0f;
+    if (pwmB > PWM_MAX) pwmB = PWM_MAX;
     
 
     
@@ -449,11 +450,14 @@ int controlMotorsPID(float dt)
         pid_reset(&rightMotor.motorStats.pid);
         pid_reset(&leftMotor.motorStats.pid);
     }
-    control_motor(rightMotor,0,0);
-    control_motor(leftMotor,0,0);
+
+    control_motor(rightMotor,outputB, pwmB);
+    control_motor(leftMotor,outputA, pwmA);
+    rightMotor.motorStats.PWM = pwmB;
+    leftMotor.motorStats.PWM = pwmA;
     #if !ros_mode
     {
-        //sendMotorDataCSV();
+        sendMotorDataCSV();
     }
     #endif
 
@@ -476,27 +480,19 @@ void sendMotorDataCSV() {
     //          leftMotor.motorStats.pid.previous_error);
     // Serial.print(buffer);
 
-    printf("%s,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%lu\n",
-            "Left",
+    printf("%c,%.4f,%.4f,%.2f,%.2f,%.2f\n",'L',
             leftMotor.motorStats.velocity,
             leftMotor.motorStats.rps,
-            leftMotor.motorStats.pid.setpoint,
+            leftMotor.motorStats.PWM,
             leftMotor.motorStats.pid.error,
-            leftMotor.motorStats.pid.integral,
-            leftMotor.motorStats.pid.derivative,
-            leftMotor.motorStats.pid.previous_error,
-            duration
+            leftMotor.motorStats.pid.previous_error            
             );
-            
-    printf("%s,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%lu\n",
-            "Right",
+    printf("%c,%.4f,%.4f,%.2f,%.2f,%.2f\n",'R',
             rightMotor.motorStats.velocity,
             rightMotor.motorStats.rps,
-            rightMotor.motorStats.pid.setpoint,
+            rightMotor.motorStats.PWM,
             rightMotor.motorStats.pid.error,
-            rightMotor.motorStats.pid.integral,
-            rightMotor.motorStats.pid.derivative,
-            rightMotor.motorStats.pid.previous_error,
-            duration
-            );         
+            rightMotor.motorStats.pid.previous_error            
+            );
+    
 }

@@ -33,7 +33,7 @@ typedef struct {
 typedef struct MotorStats {
     float velocity;           // Current velocity of the motor
     float rps;                // Rotations per second of the motor
-    float motorPWM;           // PWM value for motor control
+    float PWM;           // PWM value for motor control
     PIDController pid;        // PID controller for motor control
 } MotorStats;
 

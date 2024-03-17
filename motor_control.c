@@ -33,7 +33,7 @@ int control_motor(Motor motor, float dir, float pwm) {
 
 // Function to set motor direction based on speed
 void set_motor_dir(float speed, Motor motor) {
-    printf("Speed: %f\n", speed);
+
     if (speed < 0.000001f && speed > -0.000001f) {
         gpio_put(motor.IN1_PIN, HIGH);  // Set input 1 of motor to HIGH
         gpio_put(motor.IN2_PIN, HIGH);  // Set input 2 of motor to HIGH
