@@ -8,6 +8,6 @@
 
 
 // Function declaration
-uint32_t pwm_set_freq_duty(uint slice_num, uint chan, uint32_t f, int d);
+uint32_t pwm_set_freq_duty(uint slice_num, uint chan, uint32_t f, float d);
 
 #endif // CUSTOM_PWM_H
