@@ -3,7 +3,7 @@
 #include "pico/stdlib.h"    // Include Pico standard library functions
 
 
-void init_motor(Motor *motor, uint PWM, uint IN1, uint IN2, uint ENCODER_PINS, float kp, float ki, float kd, float setpoint) {
+void init_motor(Motor *motor, uint PWM, uint IN1, uint IN2, uint ENCODER_PINS, float kp, float ki, float kd, float setpoint, char* name) {
 
 
 
@@ -18,6 +18,14 @@ void init_motor(Motor *motor, uint PWM, uint IN1, uint IN2, uint ENCODER_PINS, f
     
 
     // Initialize Motor B
+    for (int i = 0; i < max_motor_name_size; i++) {
+        if(i == 9){
+            motor->name[i] = '\0';
+            break;
+        }
+        motor->name[i] = name[i];
+        if(name[i] == '\0') break;
+    }
     motor->PWM_PIN = PWM;
     gpio_set_function(motor->PWM_PIN, GPIO_FUNC_PWM);
     motor->SLICE = pwm_gpio_to_slice_num(motor->PWM_PIN);

@@ -26,8 +26,11 @@
 #include "motor.h"
 #include <stdio.h>
 #include "tusb.h" // TinyUSB header
+#include "comms.h"
 #define ROS_MODE 0
 #define PWM_MAX 50.0f
+#define leftMotor motors[0]
+#define rightMotor motors[1]
 float time_test = 0.0f;
 float left_speed_target = 0;
 float right_speed_target =0;
@@ -80,8 +83,7 @@ void publish_odo();
 int data = 0;
 //flag for mtoor direction tests
 int flag = 1;
-Motor leftMotor;
-Motor rightMotor;
+Motor motors[2];
 uint64_t last_trigger_time = 0;
 uint64_t last_trigger_time2 = 0;
 uint64_t last_trigger_time3 = 0;
@@ -103,8 +105,8 @@ int main(){
     float ki =50;  
     float kd = 10;
 
-    init_motor(&leftMotor,MOTOR1_PWM, MOTOR1_IN1, MOTOR1_IN2,  MOTOR1_ENCODER, kp, ki, kd, 0);
-    init_motor(&rightMotor,MOTOR2_PWM, MOTOR2_IN1, MOTOR2_IN2, MOTOR2_ENCODER, kp, ki, kd, 0);
+    init_motor(&leftMotor,MOTOR1_PWM, MOTOR1_IN1, MOTOR1_IN2,  MOTOR1_ENCODER, kp, ki, kd, 0, "left");
+    init_motor(&rightMotor,MOTOR2_PWM, MOTOR2_IN1, MOTOR2_IN2, MOTOR2_ENCODER, kp, ki, kd, 0, "right");
     // init_motors(15,16,17,14,18,19);
     const uint PIN_AB = MOTOR1_ENCODER;
     const uint PIN_CD = MOTOR2_ENCODER;
@@ -221,6 +223,7 @@ int main(){
         #else
         uint64_t current_time = time_us_64();
         if (current_time - last_trigger_time >= timer_interval_us) {
+            motor_iteration(timer_interval_us);
             if(generic_flag)
             {
                 i++;
@@ -234,25 +237,28 @@ int main(){
                     generic_flag = 0;
                     printf("end\n");
                 }
-                motor_iteration(timer_interval_us);
+                // motor_iteration(timer_interval_us);
                 last_trigger_time = current_time;
                 duration = duration+( timer_interval_us / 1000);
 
-               
+              
             }
-
+             //printf("motor: %s, vel: %f, rps: %f\n",leftMotor.name, leftMotor.motorStats.velocity, leftMotor.motorStats.rps);
 
       
 
         }
-         if (tud_cdc_available()) { // Check if data is available to read
-            uint8_t buf[64];
-            uint32_t count = tud_cdc_read(buf, sizeof(buf)); // Read the data into buf
-            printf("start\n");
-            update_setpoint(setpoint,0);
-            last_trigger_time = current_time;
-            generic_flag = 1;
-        }
+        //printf("main motor test %s\n", leftMotor.name);
+        menu(motors);
+        //  if (tud_cdc_available()) { // Check if data is available to read
+        //     uint8_t buf[64];
+        //     uint32_t count = tud_cdc_read(buf, sizeof(buf)); // Read the data into buf
+        //     printf("echo %s\n", buf); // Print the data
+        //     // printf("start\n");
+        //     // update_setpoint(setpoint,0);
+        //     // last_trigger_time = current_time;
+        //     // generic_flag = 1;
+        // }
         
         #endif
         
@@ -457,7 +463,7 @@ int controlMotorsPID(float dt)
     leftMotor.motorStats.PWM = pwmA;
     #if !ros_mode
     {
-        sendMotorDataCSV();
+        //sendMotorDataCSV();
     }
     #endif
 

@@ -24,6 +24,7 @@ add_executable(pico_micro_ros_example
     motor_pid.c
     motor_calcs.c
     motor.c
+    comms.c
 )
 
 pico_generate_pio_header(pico_micro_ros_example ${CMAKE_CURRENT_LIST_DIR}/quadrature_encoder.pio)
