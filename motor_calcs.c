@@ -84,8 +84,8 @@ void calc_stats(float time, Odometry_values *vals, int32_t ENCODER1_TICKS, int32
     motorStatsB->velocity = AVERAGED2;
 
     // Calculate linear and angular velocities for odometry
-    vals->linear_velocity = ((rmp_1  + rmp_2) * (M_PI * encoder_setup.WHEEL_DIAMETER)) / (2 * 60);
-    vals->angular_velocity = ((rmp_1 - rmp_2) * (M_PI * encoder_setup.WHEEL_DIAMETER)) / (encoder_setup.WHEEL_BASE * 60);
+    vals->linear_velocity = (( v1  + v2) ) / (2.0f);
+    vals->angular_velocity = ((v2 - v1  ) ) / (encoder_setup.WHEEL_BASE);
 
 
     // Calculate new position and orientation based on velocities

@@ -26,7 +26,7 @@
 #include "motor.h"
 #include <stdio.h>
 #include "tusb.h" // TinyUSB header
-#define ROS_MODE 0
+#define ROS_MODE 1
 #define PWM_MAX 50.0f
 float time_test = 0.0f;
 float left_speed_target = 0;
@@ -80,6 +80,7 @@ void publish_odo();
 int data = 0;
 //flag for mtoor direction tests
 int flag = 1;
+int tempForIMU = -1;
 Motor leftMotor;
 Motor rightMotor;
 uint64_t last_trigger_time = 0;
@@ -223,17 +224,17 @@ int main(){
         if (current_time - last_trigger_time >= timer_interval_us) {
             if(generic_flag)
             {
-                i++;
-                if(i > 200)
-                {
-                    // update_setpoint(setpoint,0);
-                    // update_setpoint(setpoint,0);
-                    // setpoint = setpoint + 0.01;
-                    i = 0;
-                    update_setpoint(0,0);
-                    generic_flag = 0;
-                    printf("end\n");
-                }
+                // i++;
+                // if(i > 400)
+                // {
+                //     // update_setpoint(setpoint,0);
+                //     // update_setpoint(setpoint,0);
+                //     // setpoint = setpoint + 0.01;
+                //     i = 0;
+                //     update_setpoint(0,0);
+                //     generic_flag = 0;
+                //     printf("end\n");
+                // }
                 motor_iteration(timer_interval_us);
                 last_trigger_time = current_time;
                 duration = duration+( timer_interval_us / 1000);
@@ -249,9 +250,22 @@ int main(){
             uint8_t buf[64];
             uint32_t count = tud_cdc_read(buf, sizeof(buf)); // Read the data into buf
             printf("start\n");
-            update_setpoint(setpoint,0);
+            
             last_trigger_time = current_time;
-            generic_flag = 1;
+            if( generic_flag == 0)
+            {
+                printf("start\n");
+                update_setpoint(setpoint,0);
+                generic_flag = 1;
+            }
+            else
+            {
+                printf("end\n");
+                generic_flag = 0;
+                update_setpoint(0,0);
+                motor_iteration(timer_interval_us);
+            }
+
         }
         
         #endif
@@ -295,6 +309,8 @@ void timer2_callback(rcl_timer_t * timer, int64_t last_call_time){
     // }
     // mpu6050_event(&mpu6050);
     // publish_imu_raw(); 
+    msg.data = tempForIMU;
+    rcl_publish(&publisher, &msg, NULL);
 }
 
 void motor_iteration( uint64_t last_call_time) // probaby makes more sense to call this a motor iteration
@@ -345,6 +361,7 @@ void pong_subscription_callback(const void * msgin){
 
 int init_mpu6050_vals(){
     uint8_t temp = mpu6050_begin(&mpu6050);
+    tempForIMU = (int)temp;
     if(temp == 1){
         // Set scale of gyroscope
         mpu6050_set_scale(&mpu6050, MPU6050_SCALE_2000DPS);
@@ -378,10 +395,11 @@ int init_mpu6050_vals(){
 }
 void publish_odo(uint64_t current_time)
 {
+    uint64_t curr_time = time_us_64();
     odo_msg.header.frame_id.data = "odom";
     odo_msg.child_frame_id.data = "base_link";
-    odo_msg.header.stamp.sec = (int32_t) (current_time/1000000);
-    odo_msg.header.stamp.nanosec = (int32_t) (current_time%1000000)*1000;
+    odo_msg.header.stamp.sec = (int32_t) (curr_time/1000000);
+    odo_msg.header.stamp.nanosec = (int32_t) (curr_time%1000000)*1000;
 
     odo_msg.pose.pose.position.x = odo_vals.x; // x position
     odo_msg.pose.pose.position.y = odo_vals.y; // y position
@@ -389,15 +407,16 @@ void publish_odo(uint64_t current_time)
     // set the orientation
     odo_msg.pose.pose.orientation.x = 0.0; // x orientation 
     odo_msg.pose.pose.orientation.y = 0.0; // y orientation
-    odo_msg.pose.pose.orientation.z = odo_vals.theta;
+    odo_msg.pose.pose.orientation.z =0;
     // odo_msg.pose.pose.orientation.w = 0.0; // w orientation
     // set the linear velocity 
+    odo_msg.twist.twist.linear.z =0;
     odo_msg.twist.twist.linear.x = odo_vals.linear_velocity;
-    odo_msg.twist.twist.linear.y = left_speed_target;
-    odo_msg.twist.twist.linear.z = right_speed_target;
+    odo_msg.twist.twist.linear.y =0;
+
     // set the angular velocity 
-    odo_msg.twist.twist.angular.x = leftMotor.motorStats.rps;
-    odo_msg.twist.twist.angular.y = rightMotor.motorStats.rps;
+    odo_msg.twist.twist.angular.x = 0;//leftMotor.motorStats.rps;
+    odo_msg.twist.twist.angular.y = 0;// rightMotor.motorStats.rps;
     odo_msg.twist.twist.angular.z = odo_vals.angular_velocity;
     rcl_publish(&publisher_odomoter, &odo_msg, NULL);
 }
